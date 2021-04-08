@@ -98,13 +98,6 @@ namespace ACSR {
             readSparsMatrixFromBin(file_name, control_matrix);
         }
 
-
-    private:
-        const std::vector<SteerDirection> steer_directions = {SteerDirection::Up, SteerDirection::Down,
-                                                              SteerDirection::Left, SteerDirection::Right,
-                                                              SteerDirection::Stay};
-
-
         std::vector<NanowirePositionType> exploreHelper(const NanowirePositionType &states) {
             if (states.empty())
                 return std::vector<NanowirePositionType>();
@@ -134,6 +127,15 @@ namespace ACSR {
             }
             return child;
         }
+
+
+    private:
+        const std::vector<SteerDirection> steer_directions = {SteerDirection::Up, SteerDirection::Down,
+                                                              SteerDirection::Left, SteerDirection::Right,
+                                                              SteerDirection::Stay};
+
+
+
 
         static bool
         steer(const std::pair<int, int> &state, SteerDirection direction, std::pair<int, int> &new_position) {

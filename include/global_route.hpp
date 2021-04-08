@@ -11,6 +11,7 @@
 #include "utility.hpp"
 #include "transition_matrix_constructor.hpp"
 #include "boost/filesystem.hpp"
+#include <mutex>
 
 namespace ACSR {
     using ControlMatrixType = std::vector<ControlVectorType>;
@@ -34,6 +35,9 @@ namespace ACSR {
         bool constructTree2(int n_wire, IndexType init_index, IndexType target_index, const std::vector<int> &divided_vec);
 
         std::vector<IndexType> getBestSolution();
+
+        std::unordered_map<IndexType,std::vector<IndexType>> transition_map;
+        std::mutex transition_map_mutex;
 
     private:
         std::vector<ControlMatrixType> _control_matrix;
@@ -111,102 +115,72 @@ namespace ACSR {
     }
 
     void GlobalRoute::test() {
-        NanowirePositionType p1(2),p2(2);
+        using namespace std::chrono;
+        std::random_device r;
+        std::default_random_engine rd(r());
+        std::uniform_int_distribution<int> dist(0, 3);
+        auto n_wires = 8;
+        NanowirePositionType init_state;
+        NanowirePositionType target_state;
+        for (auto i = 0; i < n_wires; ++i) {
+            init_state.push_back(std::make_pair(dist(rd),dist(rd)));
+            target_state.push_back(std::make_pair(dist(rd),dist(rd)));
+        }
 
-        NanowirePositionType position(4);
-        position[0] = std::make_pair(1,0);
-        position[1] = std::make_pair(0,0);
-        position[2] = std::make_pair(2,1);
-        position[3] = std::make_pair(2,0);
+        auto init_index = electrodeVectorToIndex(n_wires,init_state);
+        auto start = high_resolution_clock::now();
 
-        p1[0]=position[0];p1[1]=position[1];
-        p2[0]=position[2];p2[1]=position[3];
+        auto vec1 = getNextStepIndexVec(init_index,{4,4});
 
-        auto index1 = electrodeVectorToIndex(2,p1);
-        auto index2 = electrodeVectorToIndex(2,p2);
+        auto stop = high_resolution_clock::now();
+        auto duration = duration_cast<milliseconds>(stop - start);
+        std::cout<<"Total Computation Time of getNextStepIndexVec: "<<duration.count()<<"\n";
+        std::cout<<"Total size of getNextStepIndexVec: "<<vec1.size()<<"\n";
+        start = stop;
+        TransitionMatrixConstructor constructor;
+        auto v2 = constructor.exploreHelper(init_state);
+        stop = high_resolution_clock::now();
+        duration = duration_cast<milliseconds>(stop - start);
+        std::cout<<"Total Computation Time of exploreHelper: "<<duration.count()<<"\n";
+        std::cout<<"Total size of exploreHelper: "<<v2.size()<<"\n";
+        std::vector<IndexType> vec2(v2.size());
+        std::transform(v2.begin(),v2.end(),vec2.begin(),[n_wires](const NanowirePositionType& p){
+            return electrodeVectorToIndex(n_wires,p);
+        });
+        std::sort(vec2.begin(),vec2.end());
 
-        auto total_index = electrodeVectorToIndex(4,position);
-
-        std::cout<<index1<<'\t'<<index2<<'\t'<<(index1<<4*2)+index2<<'\n'<<total_index<<'\n';
-
-        Eigen::SparseMatrix<TransitionControlType,Eigen::ColMajor,IndexType> new_control_vec = sparseVecMultiple(_control_matrix_vec[1].col(index1),_control_matrix_vec[1].col(index2));
-        Eigen::SparseVector<int,Eigen::ColMajor,IndexType> total_transition_vec = _transition_matrix_vec[3].col(total_index);
-
-        auto total_control_vec = _control_matrix_vec[3].col(total_index);
-        std::cout<<"new_transition_vec:" <<new_control_vec.nonZeros()<<'\n';
-
-        std::cout<<"total_transition_vec:" <<total_transition_vec.nonZeros()<<'\n';
-
-        auto v4 = controlVectorProduct(_control_matrix[1][index1], _control_matrix[1][index2]);
-
-        std::vector<IndexType> v1,v2;
-        for (int k=0; k<new_control_vec.outerSize(); ++k) {
-            for (Eigen::SparseMatrix<TransitionControlType, Eigen::ColMajor, IndexType>::InnerIterator it(new_control_vec, k); it; ++it) {
-                if(it.value()<0){
-                    std::cout<<"I am here\n";
-                }
-                //std::cout<<it.row()*new_control_vec.cols()+it.col()<<'\t';
-                v1.push_back(it.row()*new_control_vec.cols()+it.col());
+        auto s = v2.size();
+        for(auto i=0;i<s;++i){
+            if(vec1[i]!=vec2[i]){
+                std::cout<<vec1[i]<<std::endl;
             }
         }
-        std::cout<<v1.size()<<'\n';
-        auto col = _transition_matrix_vec[3].col(total_index);
-
-        std::cout<<col.outerSize()<<'\t'<<col.innerSize()<<'\n';
-        std::cout<<col<<'\n';
-
-        //for (Eigen::SparseVector<int, Eigen::ColMajor, IndexType>::InnerIterator it(_transition_matrix_vec[3].col(total_index)); it; ++it) {
-            //std::cout<<it.row()<<'\t';
-        //    v4.push_back(it.row());
-        //}
-
-        for (Eigen::SparseVector<int, Eigen::ColMajor, IndexType>::InnerIterator it(total_transition_vec); it; ++it) {
-            //std::cout<<it.row()<<'\t';
-            v2.push_back(it.row());
-        }
-        std::cout<<v2.size()<<'\n';
-        std::sort(v1.begin(),v1.end());
-        std::sort(v2.begin(),v2.end());
-
-        for(auto v:v1){
-            std::cout<<v<<'\t';
-        }
         std::cout<<'\n';
-        for(auto v:v2){
-            //std::cout<<v<<'\t';
-        }
-        std::cout<<'\n';
-        auto v3 = getNextStepIndexVec(total_index,{2,3});
-        std::sort(v3.begin(),v3.end());
-        for(auto v:v3){
-            //std::cout<<v<<'\t';
-        }
-
-        std::cout<<'\n'<<"v4:"<<v4.size()<<'\n';
-        std::sort(v4.begin(),v4.end());
-        for(auto v:v4){
-            std::cout<<v<<'\t';
-        }
-        std::cout<<'\n';
-
-
 
     }
 
     std::vector<IndexType> GlobalRoute::getNextStepIndexVec(IndexType index, const std::vector<int> &divided_vec) {
+        if(transition_map.find(index)!=transition_map.end())
+            return transition_map[index];
         auto index_vec = indexToSubIndexVec(index,divided_vec);
         std::vector<IndexType> v;
         auto size = divided_vec.size();
         if(size==1){
             return _control_matrix[divided_vec[0]-1][index_vec[0]].getIndexVector();
         }else if(size==2){
-            return controlVectorProduct(_control_matrix[divided_vec[0]-1][index_vec[0]],_control_matrix[divided_vec[1]-1][index_vec[1]]);
+            auto return_vec = controlVectorProduct(_control_matrix[divided_vec[0]-1][index_vec[0]],_control_matrix[divided_vec[1]-1][index_vec[1]]);
+            std::unique_lock<std::mutex> lock(transition_map_mutex);
+            transition_map[index] = return_vec;
+            return return_vec;
         }else{
             auto vec = _control_matrix[divided_vec[0]-1][index_vec[0]];
             for(auto i=0;i<size-1;++i){
                 vec = vec*_control_matrix[divided_vec[i]-1][index_vec[i]];
             }
-            return controlVectorProduct(vec,_control_matrix[divided_vec[size-1]-1][index_vec[size-1]]);
+            auto return_vec = controlVectorProduct(vec,_control_matrix[divided_vec[size-1]-1][index_vec[size-1]]);
+            std::unique_lock<std::mutex> lock(transition_map_mutex);
+            transition_map[index] = return_vec;
+            return return_vec;
         }
 
         /*
@@ -260,7 +234,7 @@ namespace ACSR {
                                      const std::vector<int> &divided_vec) {
 
         IndexType dimension = 1;
-        const int over_step = 1;
+        const int over_step = 2;
         int step = 0;
         for(auto i=0;i<n_wires;++i)
             dimension = dimension * 16;
@@ -427,6 +401,7 @@ namespace ACSR {
 
 
     bool GlobalRoute::constructTree2(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec) {
+        transition_map.clear();
         if(init_index==target_index){
             std::cout<<"Start and Target States Are the Same!\n";
             return false;
@@ -436,16 +411,16 @@ namespace ACSR {
             dimension = dimension * 16;
 
 
-        //auto start = std::chrono::high_resolution_clock::now();
-        //auto step = getMinimumSteps2(n_wire,init_index,target_index,divided_vec);
-        //auto stop = std::chrono::high_resolution_clock::now();
-        //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+        auto start = std::chrono::high_resolution_clock::now();
+        auto step = getMinimumSteps2(n_wire,init_index,target_index,divided_vec);
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
         auto estimated_step =getHeuristic(n_wire,init_index,target_index);
         std::cout<<"Estimated: "<<estimated_step<<"\n";
-        //std::cout<<"Actual steps:"<<step<<"; Total cost: "<<duration.count()<<"\n";
+        std::cout<<"Actual steps:"<<step<<"; Total cost: "<<duration.count()<<"\n";
 
         auto processor = std::thread::hardware_concurrency();
-        for(auto step =estimated_step;step<=estimated_step+2;++step) {
+
             target= nullptr;
             root = std::make_shared<TransitionTreeNode>(init_index,0);
             root->setPathQuality(0);
@@ -520,7 +495,7 @@ namespace ACSR {
                 std::cout << "Construct Forward Tree Successfully!\n";
                 return true;
             }
-        }
+
     }
 
     GlobalRoute::~GlobalRoute() {

@@ -15,7 +15,7 @@ int main() {
 
     ACSR::GlobalRoute route;
     route.init();
-    route.test();
+    //route.test();
     auto n_wires = 8;
     NanowirePositionType init_state;
     NanowirePositionType target_state;
@@ -30,13 +30,14 @@ int main() {
 
     auto init_index = electrodeVectorToIndex(n_wires,init_state);
     auto target_index = electrodeVectorToIndex(n_wires,target_state);
+
     if(route.constructTree2(n_wires,init_index,target_index,divided_vec)){
         auto path = route.getBestSolution();
         for(auto&p:path){
             std::cout<<p<<"->";
         }
         std::cout<<'\n';
-    };
+    }
 
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start);
