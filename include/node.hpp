@@ -9,7 +9,8 @@
 #include <eigen3/Eigen/Eigen>
 #include <numeric>
 
-namespace ACSR {
+
+namespace acsr {
     using NanowirePositionType = std::vector<std::pair<int, int>>;
     using IndexType = int64_t;
     using ControlType = uint32_t;
@@ -130,7 +131,7 @@ namespace ACSR {
 
     };
 
-    class ControlVectorType{
+    struct ControlVectorType{
     public:
         ControlVectorType()=default;
         explicit ControlVectorType(IndexType size):_size(size){
@@ -182,29 +183,10 @@ namespace ACSR {
             return productor;
         }
 
-        friend std::vector<IndexType> controlVectorProduct(const ControlVectorType& lhs,const ControlVectorType& rhs){
-            std::vector<IndexType> product;
-            for(auto& p1:lhs.vec){
-                for(auto& p2:rhs.vec){
-                    if (p1.second == 0 || p2.second == 0)continue;
-                    auto c = p1.second | p2.second;
-                    auto flag = true;
-                    while (c != 0) {
-                        if ((c & 0b11) == 0b11){
-                            flag = false;
-                            break;
-                        }
-                        c = c >> 2;
-                    }
-                    if(flag)
-                        product.emplace_back(p1.first*rhs._size+p2.first);
-                }
-            }
-            return product;
-        }
 
 
-    private:
+
+
         std::vector<std::pair<IndexType,ControlType>> vec{};
         IndexType _size{};
         IndexType _element_size{};
@@ -279,7 +261,7 @@ namespace ACSR {
 
     using NodePtr = std::shared_ptr<TransitionTreeNode>;
 }
-
+/*
 namespace Eigen {
     template<> struct NumTraits<ACSR::TransitionControlType>
             : NumTraits<double> // permits to get the epsilon, dummy_precision, lowest, highest functions
@@ -306,7 +288,7 @@ namespace Eigen {
 
 ACSR::TransitionControlType operator+(const ACSR::TransitionControlType& left,const ACSR::TransitionControlType& right){
     return right;
-}
+}*/
 
 
 #endif //TRANSITIONMATRIXROUTE_NODE_HPP

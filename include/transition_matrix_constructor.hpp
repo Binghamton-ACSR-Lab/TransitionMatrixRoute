@@ -11,7 +11,7 @@
 #include "utility.hpp"
 #include "node.hpp"
 
-namespace ACSR {
+namespace acsr {
 
     class TransitionMatrixConstructor {
 
