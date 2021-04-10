@@ -502,6 +502,11 @@ namespace acsr {
             root->setPathQuality(0);
             std::vector parent_vec{root};
             for (auto i = 0; i < step; ++i) {
+                if(parent_vec.empty()){
+                    std::thread t(&destroyBranch, root);
+                    t.detach();
+                    break;
+                }
                 auto total_size = parent_vec.size();
                 auto thread_count = std::min(int(processor), int(total_size));
                 auto count = total_size / thread_count;
