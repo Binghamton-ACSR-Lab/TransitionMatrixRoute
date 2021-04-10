@@ -58,7 +58,7 @@ namespace acsr {
 
         void constructControlMatrix(int n_wire, const std::string &file_name) {
             std::cout << "start to construct:\n\tNanowires: " << n_wire << std::endl;
-            std::vector<Eigen::Triplet<TransitionControlType, IndexType>> control_data;
+            std::vector<Eigen::Triplet<ControlType , IndexType>> control_data;
             IndexType dimension = 1;
             for (auto i = 0; i < n_wire; ++i)
                 dimension = dimension * 16;
@@ -69,13 +69,13 @@ namespace acsr {
                 for (auto &new_electrode_position : new_electrode_positions) {
                     auto control = getElectrodesControl(n_wire, current_electrode_position, new_electrode_position);
                     if (control != 0)
-                        control_data.emplace_back(Eigen::Triplet<TransitionControlType, IndexType>(
+                        control_data.emplace_back(Eigen::Triplet<ControlType, IndexType>(
                                 electrodeVectorToIndex(n_wire, new_electrode_position),
                                 index_col,
-                                TransitionControlType(control)));
+                                ControlType(control)));
                 }
             }
-            Eigen::SparseMatrix<TransitionControlType, Eigen::ColMajor, IndexType> sparseMatrix;
+            Eigen::SparseMatrix<ControlType, Eigen::ColMajor, IndexType> sparseMatrix;
             sparseMatrix.resize(dimension, dimension);
             sparseMatrix.setFromTriplets(control_data.begin(), control_data.end());
             sparseMatrix.makeCompressed();
@@ -89,7 +89,7 @@ namespace acsr {
         }
 
         static void readControlMatrix(const std::string &file_name,
-                                      Eigen::SparseMatrix<TransitionControlType, Eigen::ColMajor, IndexType> &control_matrix) {
+                                      Eigen::SparseMatrix<ControlType, Eigen::ColMajor, IndexType> &control_matrix) {
             readSparsMatrixFromBin(file_name, control_matrix);
         }
 

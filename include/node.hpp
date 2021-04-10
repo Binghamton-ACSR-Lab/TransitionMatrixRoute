@@ -15,6 +15,12 @@ namespace acsr {
     using IndexType = int64_t;
     using ControlType = uint32_t;
 
+    /**
+     * convert int64 index to vector of position
+     * @param n_wires wire count
+     * @param index index
+     * @return vector of position
+     */
     NanowirePositionType indexToElectrodeVector(int n_wires, IndexType index) {
         NanowirePositionType electrode_vector(n_wires);
         for (auto i = 0; i < n_wires; ++i) {
@@ -50,6 +56,7 @@ namespace acsr {
         return index;
     }
 
+    /*
     struct TransitionControlType {
         uint32_t control{};
 
@@ -129,7 +136,8 @@ namespace acsr {
             return out;
         }
 
-    };
+    };*/
+
 
     struct ControlVectorType{
     public:
@@ -182,17 +190,11 @@ namespace acsr {
             productor.setData(std::move(data));
             return productor;
         }
-
-
-
-
-
         std::vector<std::pair<IndexType,ControlType>> vec{};
         IndexType _size{};
         IndexType _element_size{};
-
-
     };
+
 
 
     class TransitionTreeNode : public std::enable_shared_from_this<TransitionTreeNode> {
@@ -258,37 +260,9 @@ namespace acsr {
         std::list<std::shared_ptr<TransitionTreeNode>> children;
 
     };
-
     using NodePtr = std::shared_ptr<TransitionTreeNode>;
 }
-/*
-namespace Eigen {
-    template<> struct NumTraits<ACSR::TransitionControlType>
-            : NumTraits<double> // permits to get the epsilon, dummy_precision, lowest, highest functions
-    {
-        typedef ACSR::TransitionControlType Real;
-        typedef ACSR::TransitionControlType NonInteger;
-        typedef ACSR::TransitionControlType Nested;
-        enum {
-            IsComplex = 0,
-            IsInteger = 1,
-            IsSigned = 0,
-            RequireInitialization = 1,
-            ReadCost = 1,
-            AddCost = 3,
-            MulCost = 3
-        };
-    };
-    template<typename BinaryOp>
-    struct ScalarBinaryOpTraits<ACSR::TransitionControlType,uint32_t,BinaryOp> { typedef ACSR::TransitionControlType ReturnType;  };
 
-    template<typename BinaryOp>
-    struct ScalarBinaryOpTraits<uint32_t ,ACSR::TransitionControlType,BinaryOp> { typedef ACSR::TransitionControlType ReturnType;  };
-}
-
-ACSR::TransitionControlType operator+(const ACSR::TransitionControlType& left,const ACSR::TransitionControlType& right){
-    return right;
-}*/
 
 
 #endif //TRANSITIONMATRIXROUTE_NODE_HPP

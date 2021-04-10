@@ -18,59 +18,91 @@ namespace acsr {
     using ControlMatrixType = std::vector<ControlVectorType>;
 
     class GlobalRoute {
-
     public:
-        //constructors and deconstructor
+        /**
+         * default constructor
+         */
         GlobalRoute()=default;
+        /**
+         * deconstructor
+         */
         virtual ~GlobalRoute();
 
+        /**
+         * copy constructor deleted
+         */
         GlobalRoute(const GlobalRoute &) = delete;
 
+        /**
+         * assign operator deleted
+         * @return
+         */
         GlobalRoute &operator=(const GlobalRoute &) = delete;
 
-
+        /**
+         * initialize
+         */
         void init();
-        void test();
 
-        bool constructTree(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec);
-        bool constructTree2(int n_wire, IndexType init_index, IndexType target_index, const std::vector<int> &divided_vec);
-        bool constructTree3(int n_wire, IndexType init_index, IndexType target_index, const std::vector<int> &divided_vec);
-        bool constructTree4(int n_wire, IndexType init_index, IndexType target_index, const std::vector<int> &divided_vec);
+        /**
+         * construct a tree
+         * @param n_wire nanowire count
+         * @param init_index init index corresponding state
+         * @param target_index target index corresponding state
+         * @param divided_vec a vector to divide n_wire to small count
+         * @return true if construct tree success
+         */
+        bool constructTree(int n_wire, IndexType init_index, IndexType target_index, const std::vector<int> &divided_vec);
 
+        /**
+         * get best solution
+         * @return a vector of position index from target to init
+         */
         std::vector<IndexType> getBestSolution();
 
-        std::unordered_set<IndexType> transition_set;
-        std::mutex transition_set_mutex;
-
     private:
-        std::vector<ControlMatrixType> _control_matrix;
+        ///a vector of control matrix, total size = 4 for nanowire count = 1,2,3,4
+        std::vector<ControlMatrixType> _control_matrix_vec;
+        ///a vector of transition matrix, total size = 4 for nanowire count = 1,2,3,4
         std::vector<Eigen::SparseMatrix<int, Eigen::ColMajor, IndexType>> _transition_matrix_vec;
-        std::vector<Eigen::SparseMatrix<TransitionControlType, Eigen::ColMajor, IndexType>> _control_matrix_vec;
+        ///the root of the constructed tree
         NodePtr root= nullptr;
+        ///target of the constructed tree
         NodePtr target= nullptr;
-        std::atomic_int64_t reading_times{0};
 
     private:
-        std::vector<IndexType> getNextStepIndexVec(IndexType index,const std::vector<int>& divided_vec);
-        std::vector<IndexType> getNextStepIndexVecWithinSteps(int n_wires, IndexType index, IndexType index2, const std::vector<int>& divided_vec, int step);
+        /**
+         * get the posible indice of performing one step from index
+         * @param index the original index
+         * @param divided_vec a vector of nanowire count
+         * @return the vector of possible indice
+         */
+        //std::vector<IndexType> getNextStepIndexVec(IndexType index,const std::vector<int>& divided_vec);
 
-        std::vector<IndexType> readNextStep(IndexType index);
-        void writeNextStep(IndexType,const std::vector<IndexType>& vec);
+        /**
+         * get the posible indice of performing one step from index, the cost of those indice to target should within step
+         * @param n_wires wires count
+         * @param index the original index
+         * @param target target
+         * @param divided_vec a vector of nanowire count
+         * @param step max cost to target
+         * @return the vector of possible indice
+         */
+        std::vector<IndexType> getNextStepIndexVecWithinSteps(int n_wires, IndexType index, IndexType target, const std::vector<int>& divided_vec, int step);
 
+        /**
+         * combine two hash map
+         * @param m1 map1
+         * @param m2 map2
+         */
         void combineMap(std::unordered_map<IndexType,NodePtr>& m1,std::unordered_map<IndexType,NodePtr>& m2);
-
-        template<class T1,class T2>
-                Eigen::SparseVector<TransitionControlType,Eigen::ColMajor,IndexType> sparseVecMultiple(const T1& v1,const T2& v2);
-        int getMinimumSteps(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec);
-        int getMinimumSteps2(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec);
-
-
-
     };
 
     void GlobalRoute::init() {
         TransitionMatrixConstructor constructor;
         using namespace boost::filesystem;
+
+        ///construct transition matrix if not exist
         if(!exists("data") || !exists("data/transition_matrix")){
             create_directories("data/transition_matrix");
         }
@@ -87,6 +119,7 @@ namespace acsr {
             constructor.constructMatrix(4,"data/transition_matrix/_matrix_4_.bin");
         }
 
+        ///construct control matrix if not exist
         if(!exists("data/transition_matrix/_control_matrix_1_.bin")){
             constructor.constructControlMatrix(1,"data/transition_matrix/_control_matrix_1_.bin");
         }
@@ -99,168 +132,54 @@ namespace acsr {
         if(!exists("data/transition_matrix/_control_matrix_4_.bin")){
             constructor.constructControlMatrix(4,"data/transition_matrix/_control_matrix_4_.bin");
         }
+        std::vector<Eigen::SparseMatrix<ControlType, Eigen::ColMajor, IndexType>> temp_control_matrix_vec(4);
+
         _transition_matrix_vec.resize(4);
         _control_matrix_vec.resize(4);
-        _control_matrix.resize(4);
+
+        ///read data from file
         for(auto i=0;i<4;++i){
             char ss1[200],ss2[200];
             sprintf(ss1,"data/transition_matrix/_matrix_%d_.bin",i+1);
             sprintf(ss2,"data/transition_matrix/_control_matrix_%d_.bin",i+1);
             TransitionMatrixConstructor::readTransitionMatrix(ss1,_transition_matrix_vec[i]);
-            TransitionMatrixConstructor::readControlMatrix(ss2,_control_matrix_vec[i]);
-            _control_matrix[i].resize(_control_matrix_vec[i].cols());
-            std::vector<std::vector<std::pair<IndexType,ControlType>>> data(_control_matrix_vec[i].cols());
-            for (int k=0; k<_control_matrix_vec[i].outerSize(); ++k) {
-                for (Eigen::SparseMatrix<TransitionControlType, Eigen::ColMajor, IndexType>::InnerIterator it(_control_matrix_vec[i], k); it; ++it) {
-                    data[it.col()].push_back(std::make_pair(it.row(),it.value().control));
+            TransitionMatrixConstructor::readControlMatrix(ss2,temp_control_matrix_vec[i]);
+            _control_matrix_vec[i].resize(temp_control_matrix_vec[i].cols());
+            std::vector<std::vector<std::pair<IndexType,ControlType>>> data(temp_control_matrix_vec[i].cols());
+            for (int k=0; k<temp_control_matrix_vec[i].outerSize(); ++k) {
+                for (Eigen::SparseMatrix<ControlType, Eigen::ColMajor, IndexType>::InnerIterator it(temp_control_matrix_vec[i], k); it; ++it) {
+                    data[it.col()].push_back(std::make_pair(it.row(),it.value()));
                 }
             }
-            for(auto k=0;k<_control_matrix_vec[i].cols();++k){
-                _control_matrix[i][k].setSize(_control_matrix_vec[i].rows());
-                _control_matrix[i][k].setData(std::move(data[k]));
+            for(auto k=0;k<temp_control_matrix_vec[i].cols();++k){
+                _control_matrix_vec[i][k].setSize(temp_control_matrix_vec[i].rows());
+                _control_matrix_vec[i][k].setData(std::move(data[k]));
             }
         }
-
-        /*
-        if(exists("temp")){
-            remove_all("temp");
-        }
-        create_directories("temp");
-        */
         std::cout<<"Initialize Complete\n";
     }
 
-    void GlobalRoute::test() {
-        using namespace std::chrono;
-        //std::random_device r;
-        std::default_random_engine rd;
-        std::uniform_int_distribution<int> dist(0, 3);
-        auto n_wires = 8;
-        long t1=0,t2=0,t3=0,t4=0;
-
-        SQLite::Database    db("mysqlite", SQLite::OPEN_READWRITE|SQLite::OPEN_CREATE);
-        db.exec("DROP TABLE IF EXISTS test");
-        db.exec("CREATE TABLE test (id INTEGER PRIMARY KEY, value BLOB)");
-
-        std::vector<IndexType> sql_data1;
-
-        for(auto k=0;k<100;++k) {
-            NanowirePositionType init_state;
-            NanowirePositionType target_state;
-            for (auto i = 0; i < n_wires; ++i) {
-                init_state.push_back(std::make_pair(dist(rd), dist(rd)));
-                target_state.push_back(std::make_pair(dist(rd), dist(rd)));
-            }
-
-            auto init_index = electrodeVectorToIndex(n_wires, init_state);
-
-            auto start = high_resolution_clock::now();
-            auto vec1 = getNextStepIndexVec(init_index, {4, 4});
-            auto stop = high_resolution_clock::now();
-            auto duration = duration_cast<microseconds>(stop - start);
-            t1+=duration.count();
-
-
-
-            start = high_resolution_clock::now();
-            TransitionMatrixConstructor constructor;
-            auto v2 = constructor.exploreHelper(init_state);
-            stop = high_resolution_clock::now();
-            duration = duration_cast<microseconds>(stop - start);
-            t2+=duration.count();
-
-            //std::cout << "Total size of exploreHelper: " << v2.size() << "\n";
-
-
-
-            /*
-            start = high_resolution_clock::now();
-            writeNextStep(init_index, vec1);
-            //std::this_thread::sleep_for(std::chrono::milliseconds (1));
-            auto v3 = readNextStep(init_index);
-            stop = high_resolution_clock::now();
-            duration = duration_cast<microseconds>(stop - start);
-            t3+=duration.count();*/
-
-            sql_data1.push_back(init_index);
-
-            start = high_resolution_clock::now();
-            //auto vec_size = vec1.size();
-
-
-            SQLite::Statement query(db, "INSERT INTO test VALUES (?, ?)");
-            query.bind(1,init_index);
-            query.bind(2,vec1.data(),vec1.size()*sizeof(int64_t));
-            query.exec ();
-            stop = high_resolution_clock::now();
-            duration = duration_cast<microseconds>(stop - start);
-            t4+=duration.count();
-
-
-
-            //std::cout << "Total size of Read From file: " << v3.size() << "\n";
-        }
-
-
-
 /*
-        auto start = high_resolution_clock::now();
-        for(auto v:sql_data1) {
-            SQLite::Statement query(db, "SELECT * FROM test WHERE id="+std::to_string(v));
-
-            if (query.executeStep())
-            {
-
-                SQLite::Column colSize = query.getColumn(1);
-                auto vec_size = colSize.getInt();
-                std::vector<int64_t> vec2(vec_size);
-                SQLite::Column colBlob = query.getColumn(2);
-                auto blob2 = colBlob.getBlob();
-                std::memcpy(vec2.data(),blob2,vec_size*sizeof(int64_t));
-            }
-        }
-        auto stop = high_resolution_clock::now();
-        auto duration = duration_cast<microseconds>(stop - start);
-        t4+= duration.count();
-*/
-        std::cout << "Total Computation Time of getNextStepIndexVec: " << t1 << "\n";
-        std::cout << "Total Computation Time of exploreHelper: " << t2 << "\n";
-        std::cout << "Total Computation Time of Read From file: " << t3 << "\n";
-        std::cout << "Total Computation Time of Read From Sql: " << t4 << "\n";
-        std::cout<<'\n';
-
-    }
-
     std::vector<IndexType> GlobalRoute::getNextStepIndexVec(IndexType index, const std::vector<int> &divided_vec) {
-        /*{
-            std::unique_lock<std::mutex> lock(transition_set_mutex);
-            if (transition_set.find(index) != transition_set.end()) {
-                ++reading_times;
-                return readNextStep(index);
-            }
-        }*/
         auto index_vec = indexToSubIndexVec(index,divided_vec);
         std::vector<IndexType> v;
         auto size = divided_vec.size();
         if(size==1){
-            return _control_matrix[divided_vec[0]-1][index_vec[0]].getIndexVector();
+            return _control_matrix_vec[divided_vec[0]-1][index_vec[0]].getIndexVector();
         }else if(size==2){
-            auto return_vec = controlVectorProduct(_control_matrix[divided_vec[0]-1][index_vec[0]],_control_matrix[divided_vec[1]-1][index_vec[1]]);
-            //writeNextStep(index,return_vec);
-            std::unique_lock<std::mutex> lock(transition_set_mutex);
-            transition_set.insert(index);
-            return return_vec;
+            return  controlVectorProduct(_control_matrix_vec[divided_vec[0]-1][index_vec[0]],_control_matrix_vec[divided_vec[1]-1][index_vec[1]]);
         }else{
-            auto vec = _control_matrix[divided_vec[0]-1][index_vec[0]];
+            auto vec = _control_matrix_vec[divided_vec[0]-1][index_vec[0]];
             for(auto i=0;i<size-1;++i){
-                vec = vec*_control_matrix[divided_vec[i]-1][index_vec[i]];
+                vec = vec*_control_matrix_vec[divided_vec[i]-1][index_vec[i]];
             }
-            auto return_vec = controlVectorProduct(vec,_control_matrix[divided_vec[size-1]-1][index_vec[size-1]]);
+            auto return_vec = controlVectorProduct(vec,_control_matrix_vec[divided_vec[size-1]-1][index_vec[size-1]]);
             //writeNextStep(index,return_vec);
             return return_vec;
         }
-    }
+    }*/
 
+    /*
     template<class T1, class T2>
     Eigen::SparseVector<TransitionControlType, Eigen::ColMajor, IndexType>
     GlobalRoute::sparseVecMultiple(const T1 &v1, const T2 &v2) {
@@ -281,8 +200,9 @@ namespace acsr {
         }
         return vec;
 
-    }
+    }*/
 
+    /*
     int GlobalRoute::getMinimumSteps2(int n_wires, IndexType init_index, IndexType target_index,
                                      const std::vector<int> &divided_vec) {
 
@@ -377,7 +297,9 @@ namespace acsr {
             }
         }
     }
+*/
 
+    /*
     int GlobalRoute::getMinimumSteps(int n_wires,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec) {
 
         IndexType dimension = 1;
@@ -410,7 +332,17 @@ namespace acsr {
             index_set = std::move(new_set);
         }
     }
+*/
 
+
+    /**
+     * construct a tree
+     * @param n_wire nanowire count
+     * @param init_index init index corresponding state
+     * @param target_index target index corresponding state
+     * @param divided_vec a vector to divide n_wire to small count
+     * @return true if construct tree success
+     */
     bool GlobalRoute::constructTree(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec) {
         if(init_index==target_index){
             std::cout<<"Start and Target States Are the Same!\n";
@@ -419,83 +351,10 @@ namespace acsr {
         IndexType dimension = 1;
         for(auto i=0;i<n_wire;++i)
             dimension = dimension * 16;
-        target = nullptr;
-        root = std::make_shared<TransitionTreeNode>(init_index,0);
-        root->setPathQuality(0);
 
-        auto start = std::chrono::high_resolution_clock::now();
-        auto step = getMinimumSteps2(n_wire,init_index,target_index,divided_vec);
-        auto stop = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-        std::cout<<"Find min step cost: "<<duration.count()<<"\n";
-        std::vector parent_vec{root};
-        for(auto i=0;i<step;++i){
-            std::cout<<"Construct Tree, Step "<<i+1<<"\n";
-            std::vector<std::pair<NodePtr ,std::vector<IndexType>>> children_vec;
-            for(auto& parent:parent_vec){
-                children_vec.emplace_back(parent,std::move(getNextStepIndexVec(parent->getState(),divided_vec)));
-            }
-            std::unordered_map<IndexType,NodePtr> children_map;
-            for(auto& vec:children_vec){
-                for(auto& child_index:vec.second){
-                    if(!withinHeuristic(n_wire,target_index,child_index,step-i-1))continue;
-                    auto& current_parent = children_map[child_index];
-                    if( current_parent == nullptr || current_parent->getPathQuality()>vec.first->getPathQuality()){
-                        current_parent = vec.first;
-                    }
-                }
-            }
-            std::vector<NodePtr> temp_parent_vec;
-            for(auto& p:children_map){
-                auto node = std::make_shared<TransitionTreeNode>(p.first,i+1);
-                node->setPathQuality(p.second->getPathQuality()+getQuality(n_wire,p.first));
-                node->setParent(p.second);
-                p.second->addChild(node);
-                temp_parent_vec.push_back(node);
-                if(i==step-1){
-                    target=node;
-                }
-            }
-            for(auto& p:parent_vec){
-                //trimLeaf(p);
-            }
-            parent_vec = std::move(temp_parent_vec);
-        }
-        if(target==nullptr){
-            std::thread t(&destroyBranch,root);
-            t.detach();
-            return false;
-        }else {
-            return true;
-            std::cout<<"Construct Forward Tree Successfully!\n";
-        }
-    }
-
-
-
-    bool GlobalRoute::constructTree2(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec) {
-        //transition_map.clear();
-        int over_step = 1;
-        if(init_index==target_index){
-            std::cout<<"Start and Target States Are the Same!\n";
-            return false;
-        }
-        IndexType dimension = 1;
-        for(auto i=0;i<n_wire;++i)
-            dimension = dimension * 16;
-
-
-        //auto start = std::chrono::high_resolution_clock::now();
-        //auto step = getMinimumSteps2(n_wire,init_index,target_index,divided_vec);
-
-        //auto stop = std::chrono::high_resolution_clock::now();
-        //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-        //auto estimated_step =getHeuristic(n_wire,init_index,target_index);
-        //std::cout<<"Estimated: "<<estimated_step<<"\n";
-        //std::cout<<"Actual steps:"<<step<<"; Total cost: "<<duration.count()<<"\n";
 
         auto processor = std::thread::hardware_concurrency();
-        for(over_step=0;over_step<2;++over_step) {
+        for(auto over_step=0;over_step<2;++over_step) {
             auto step = getHeuristic(n_wire,init_index,target_index)+over_step;
             target = nullptr;
             root = std::make_shared<TransitionTreeNode>(init_index, 0);
@@ -575,19 +434,6 @@ namespace acsr {
                 }
                 auto children_map = std::move(children_map_vecs[0]);
 
-
-                /*
-                std::unordered_map<IndexType, NodePtr> children_map;
-                for (auto &children_vec:children_vecs)
-                    for (auto &vec:children_vec) {
-                        for (auto &child_index:vec.second) {
-                            auto &current_parent = children_map[child_index];
-                            if (current_parent == nullptr ||
-                                current_parent->getPathQuality() > vec.first->getPathQuality()) {
-                                current_parent = vec.first;
-                            }
-                        }
-                    }*/
                 stop = std::chrono::high_resolution_clock::now();
                 duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
                 std::cout << "Combine Cost: " << duration.count() << '\n';
@@ -618,7 +464,6 @@ namespace acsr {
                 std::thread t(&destroyBranch, root);
                 t.detach();
             } else {
-                std::cout << "Read File Times During Finding Minimum Steps Process: " << reading_times << '\n';
                 std::cout << "Construct Forward Tree Successfully!\n";
                 return true;
             }
@@ -626,313 +471,19 @@ namespace acsr {
 
     }
 
-    bool GlobalRoute::constructTree3(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec) {
-
-        if(init_index==target_index){
-            std::cout<<"Start and Target States Are the Same!\n";
-            return false;
-        }
-        IndexType dimension = 1;
-        for(auto i=0;i<n_wire;++i)
-            dimension = dimension * 16;
-
-        auto step = getHeuristic(n_wire,init_index,target_index)+1;
-        auto processor = std::thread::hardware_concurrency();
-
-        target= nullptr;
-        root = std::make_shared<TransitionTreeNode>(init_index,0);
-        root->setPathQuality(0);
-        std::vector parent_vec{root};
-        for (auto i = 0; i < step; ++i) {
-            auto total_size = parent_vec.size();
-            auto thread_count = std::min(IndexType(processor), IndexType(total_size));
-            auto count = total_size / thread_count;
-            std::vector<std::unordered_map<IndexType , NodePtr>> children_map_vecs(thread_count);
-            std::vector<std::thread> thread_vec;
-            std::cout<<"Construct Tree, Step "<<i+1<<"\n";
-            auto start = std::chrono::high_resolution_clock::now();
-            for (auto k = 0; k < thread_count - 1; ++k) {
-                auto& m = children_map_vecs[k];
-                thread_vec.emplace_back([target_index,n_wire,i,step, &parent_vec, count, k, &m, this, &divided_vec]() {
-                    std::vector<std::pair<std::pair<NodePtr,int>,std::vector<IndexType>>> children_list;
-                    for (auto index = k * count; index < (k + 1) * count; ++index) {
-                        //auto current_quality = parent_vec[index]->getPathQuality();
-                        auto current_parent = parent_vec[index];
-                        auto vec = getNextStepIndexVecWithinSteps(n_wire,current_parent->getState(),target_index,divided_vec,step - i - 1);
-                        children_list.push_back({{parent_vec[index],index-k * count}, std::move(vec)});
-                    }
-                    std::map<IndexType,std::vector<std::pair<NodePtr,int>>,std::greater<>> map;
-
-                    for (auto it = children_list.begin(); it != children_list.end();++it) {
-                        map[it->second.back()].push_back(it->first);
-                        it->second.pop_back();
-                    }
-
-                    while(!map.empty()) {
-                        auto& node_vec = map.begin()->second;
-                        auto best_parent = node_vec.begin()->first;
-
-                        for(auto & it : node_vec){
-                            if(it.first->getPathQuality()<best_parent->getPathQuality())best_parent=it.first;
-                            auto index = it.second;
-                            if(!children_list[index].second.empty()){
-                                map[children_list[index].second.back()].push_back(children_list[index].first);
-                                children_list[index].second.pop_back();
-                            }
-                        }
-                        m.insert(std::make_pair(map.begin()->first,best_parent));
-                        map.erase(map.begin());
-                    }
-                });
-            }
-
-            auto& m = children_map_vecs[thread_count - 1];
-            std::vector<std::pair<std::pair<NodePtr,int>,std::vector<IndexType>>> children_list;
-            for (auto index = count * (thread_count - 1); index < total_size; ++index) {
-                //auto current_quality = parent_vec[index]->getPathQuality();
-                auto current_parent = parent_vec[index];
-                std::vector<IndexType> vec = getNextStepIndexVecWithinSteps(n_wire,current_parent->getState(),target_index,divided_vec,step - i - 1);
-                children_list.push_back({{parent_vec[index],index-(thread_count - 1)* count}, std::move(vec)});
-            }
-            std::map<IndexType,std::vector<std::pair<NodePtr,int>>,std::greater<>> map;
-            std::cout<<children_list.size()<<std::endl;
-            for (auto it = children_list.begin(); it != children_list.end();++it) {
-                map[it->second.back()].push_back(it->first);
-                it->second.pop_back();
-            }
-
-            while(!map.empty()) {
-                auto& node_vec = map.begin()->second;
-                auto best_parent = node_vec.begin()->first;
-
-                for(auto & it : node_vec){
-                    if(it.first->getPathQuality()<best_parent->getPathQuality())best_parent=it.first;
-                    auto index = it.second;
-                    if(!children_list[index].second.empty()){
-                        map[children_list[index].second.back()].push_back(children_list[index].first);
-                        children_list[index].second.pop_back();
-                    }
-                }
-                m.insert(std::make_pair(map.begin()->first,best_parent));
-                map.erase(map.begin());
-            }
-
-
-            for (auto &t:thread_vec) {
-                if (t.joinable())t.join();
-            }
-
-            auto stop = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-            std::cout<<"Find Layer Cost: "<<duration.count()<<'\n';
-            start = stop;
-
-
-            while(thread_count>1){
-                auto remain = thread_count%2;
-                int new_thread_count = thread_count/2;
-                std::vector<std::thread> combine_thread_vec;
-                for(auto i=0;i<new_thread_count-1;++i){
-                    combine_thread_vec.emplace_back(&GlobalRoute::combineMap,this,std::ref(children_map_vecs[i]),std::ref(children_map_vecs[thread_count-1-i]));
-                }
-                combineMap(children_map_vecs[new_thread_count-1],children_map_vecs[thread_count-new_thread_count]);
-                for(auto& t:combine_thread_vec){
-                    if(t.joinable())t.join();
-                }
-                thread_count = new_thread_count+remain;
-            }
-            auto& children_map = children_map_vecs[0];
-
-
-            /*
-            std::unordered_map<IndexType, NodePtr> children_map;
-            for (auto &children_vec:children_vecs)
-                for (auto &vec:children_vec) {
-                    for (auto &child_index:vec.second) {
-                        auto &current_parent = children_map[child_index];
-                        if (current_parent == nullptr ||
-                            current_parent->getPathQuality() > vec.first->getPathQuality()) {
-                            current_parent = vec.first;
-                        }
-                    }
-                }*/
-            stop = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-            std::cout<<"Combine Cost: "<<duration.count()<<'\n';
-            start = stop;
-
-            std::vector<NodePtr> temp_parent_vec;
-            for (auto &p:children_map) {
-                auto node = std::make_shared<TransitionTreeNode>(p.first, i + 1);
-                node->setPathQuality(p.second->getPathQuality() + getQuality(n_wire, p.first));
-                node->setParent(p.second);
-                p.second->addChild(node);
-                temp_parent_vec.push_back(node);
-                if (i == step - 1) {
-                    target = node;
-                }
-            }
-            stop = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-            std::cout<<"Add Node Cost: "<<duration.count()<<'\n';
-            /*
-            for (auto &p:parent_vec) {
-                trimLeaf(p);
-            }
-             */
-            parent_vec = std::move(temp_parent_vec);
-        }
-        if (target == nullptr) {
-            std::thread t(&destroyBranch, root);
-            t.detach();
-        } else {
-            std::cout<<"Read File Times During Finding Minimum Steps Process: "<<reading_times<<'\n';
-            std::cout << "Construct Forward Tree Successfully!\n";
-            return true;
-        }
-
-    }
-
-    bool GlobalRoute::constructTree4(int n_wire,IndexType init_index,IndexType target_index,const std::vector<int>& divided_vec) {
-
-        if(init_index==target_index){
-            std::cout<<"Start and Target States Are the Same!\n";
-            return false;
-        }
-        IndexType dimension = 1;
-        for(auto i=0;i<n_wire;++i)
-            dimension = dimension * 16;
-
-        auto step = getHeuristic(n_wire,init_index,target_index)+1;
-        auto processor = std::thread::hardware_concurrency();
-
-        target= nullptr;
-        root = std::make_shared<TransitionTreeNode>(init_index,0);
-        root->setPathQuality(0);
-        std::vector parent_vec{root};
-        for (auto i = 0; i < step; ++i) {
-            auto total_size = parent_vec.size();
-            auto thread_count = std::min(IndexType(processor), IndexType(total_size));
-            auto count = total_size / thread_count;
-            std::vector<std::unordered_multimap<IndexType , NodePtr>> children_map_vecs(thread_count);
-            std::vector<std::thread> thread_vec;
-            std::cout<<"Construct Tree, Step "<<i+1<<"\n";
-            auto start = std::chrono::high_resolution_clock::now();
-            for (auto k = 0; k < thread_count - 1; ++k) {
-                auto& m = children_map_vecs[k];
-                thread_vec.emplace_back([target_index,n_wire,i,step, &parent_vec, count, k, &m, this, &divided_vec]() {
-                    for (auto index = k * count; index < (k + 1) * count; ++index) {
-                        auto current_parent = parent_vec[index];
-                        auto vec = getNextStepIndexVecWithinSteps(n_wire,current_parent->getState(),target_index,divided_vec,step - i - 1);
-                        for(auto&v:vec){
-                            m.insert({v,current_parent});
-                        }
-                    }
-                });
-            }
-
-            auto& m = children_map_vecs[thread_count - 1];
-            for (auto index = count * (thread_count - 1); index < total_size; ++index) {
-                auto current_parent = parent_vec[index];
-                auto vec = getNextStepIndexVecWithinSteps(n_wire,current_parent->getState(),target_index,divided_vec,step - i - 1);
-                for(auto&v:vec){
-                    m.insert({v,parent_vec[index]});
-                }
-            }
-
-            for (auto &t:thread_vec) {
-                if (t.joinable())t.join();
-            }
-
-            auto stop = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-            std::cout<<"Find Layer Cost: "<<duration.count()<<'\n';
-            start = stop;
-
-
-            while(thread_count>1){
-                auto remain = thread_count%2;
-                int new_thread_count = thread_count/2;
-
-
-                std::vector<std::thread> combine_thread_vec;
-                for(auto i=0;i<new_thread_count-1;++i){
-                    combine_thread_vec.emplace_back(std::thread([i,&children_map_vecs,thread_count](){
-                        children_map_vecs[i].merge(children_map_vecs[thread_count-1-i]);
-                        children_map_vecs[thread_count-1-i].clear();
-                    }));
-                }
-                children_map_vecs[new_thread_count-1].merge(children_map_vecs[thread_count-new_thread_count]);
-                children_map_vecs[thread_count-new_thread_count].clear();
-                for(auto& t:combine_thread_vec){
-                    if(t.joinable())t.join();
-                }
-                thread_count = new_thread_count+remain;
-            }
-            auto children_map = std::move(children_map_vecs[0]);
-
-            stop = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-            std::cout<<"Combine Cost: "<<duration.count()<<'\n';
-            start = stop;
-
-            std::vector<NodePtr> temp_parent_vec;
-            auto best_parent = children_map.begin()->second;
-            auto current_index = children_map.begin()->first;
-            auto it = children_map.begin();
-            std::advance(it,1);
-            for (;it!=children_map.end();++it) {
-                if(it->first==current_index){
-                    best_parent = best_parent->getPathQuality()<=it->second->getPathQuality()?best_parent:it->second;
-                    continue;
-                }
-
-                auto node = std::make_shared<TransitionTreeNode>(current_index, i + 1);
-                node->setPathQuality(best_parent->getPathQuality() + getQuality(n_wire, current_index));
-                node->setParent(best_parent);
-                best_parent->addChild(node);
-                temp_parent_vec.push_back(node);
-                if (i == step - 1) {
-                    target = node;
-                }
-            }
-            auto node = std::make_shared<TransitionTreeNode>(current_index, i + 1);
-            node->setPathQuality(best_parent->getPathQuality() + getQuality(n_wire, current_index));
-            node->setParent(best_parent);
-            best_parent->addChild(node);
-            temp_parent_vec.push_back(node);
-            if (i == step - 1) {
-                target = node;
-            }
-
-
-            stop = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-            std::cout<<"Add Node Cost: "<<duration.count()<<'\n';
-            /*
-            for (auto &p:parent_vec) {
-                trimLeaf(p);
-            }
-             */
-            parent_vec = std::move(temp_parent_vec);
-        }
-        if (target == nullptr) {
-            std::thread t(&destroyBranch, root);
-            t.detach();
-        } else {
-            std::cout<<"Read File Times During Finding Minimum Steps Process: "<<reading_times<<'\n';
-            std::cout << "Construct Forward Tree Successfully!\n";
-            return true;
-        }
-
-    }
-
+    /**
+     * deconstruct, destroy tree
+     */
     GlobalRoute::~GlobalRoute() {
         boost::filesystem::remove_all("temp");
         std::thread t(&destroyBranch,root);
         t.detach();
     }
 
+    /**
+     * get best solution
+     * @return best solution, from target to start state
+     */
     std::vector<IndexType> GlobalRoute::getBestSolution() {
         std::vector<IndexType> solution;
         if(root== nullptr || target== nullptr)return solution;
@@ -945,6 +496,7 @@ namespace acsr {
         return solution;
     }
 
+    /*
     void GlobalRoute::writeNextStep(IndexType index, const std::vector<IndexType> &vec) {
         std::string filename = "temp/_"+std::to_string(index)+".bin";
         std::ofstream fout(filename, std::ios::out | std::ios::binary);
@@ -963,15 +515,24 @@ namespace acsr {
         vec.resize(filesize/sizeof(IndexType));
         is.read((char *)vec.data(), filesize);
         return vec;
-    }
+    }*/
 
+    /**
+     * get the posible indice of performing one step from index, the cost of those indice to target should within step
+     * @param n_wires wires count
+     * @param index the original index
+     * @param target target
+     * @param divided_vec a vector of nanowire count
+     * @param step max cost to target
+     * @return the vector of possible indice
+     */
     std::vector<IndexType>
     GlobalRoute::getNextStepIndexVecWithinSteps(int n_wires, IndexType index, IndexType index2, const std::vector<int> &divided_vec, int winthin_step) {
         auto index_vec = indexToSubIndexVec(index,divided_vec);
         auto size = divided_vec.size();
         if(size==1){
             std::vector<IndexType> v;
-            auto vec = _control_matrix[divided_vec[0]-1][index_vec[0]].getIndexVector();
+            auto vec = _control_matrix_vec[divided_vec[0]-1][index_vec[0]].getIndexVector();
             std::copy_if(vec.begin(),vec.end(),std::back_inserter(v),[n_wires,index2,winthin_step](IndexType i){
                 return withinHeuristic(n_wires, i, index2, winthin_step);
             });
@@ -980,12 +541,17 @@ namespace acsr {
             auto target_index_vec = indexToSubIndexVec(index2,divided_vec);
             std::vector<ControlVectorType> control_vec(size);
             for(auto i=0;i<size;++i){
-                control_vec[i]=_control_matrix[divided_vec[i]-1][index_vec[i]];
+                control_vec[i]=_control_matrix_vec[divided_vec[i]-1][index_vec[i]];
             }
             return controlVectorProductWithStep(control_vec,index_vec,target_index_vec,divided_vec,winthin_step);
         }
     }
 
+    /**
+     * combine two hash map
+     * @param m1 map1
+     * @param m2 map2
+     */
     void GlobalRoute::combineMap(std::unordered_map<IndexType, NodePtr> &map1,std::unordered_map<IndexType, NodePtr> &map2) {
         if(map1.empty() && map2.empty())return;
         for(auto & it : map2){

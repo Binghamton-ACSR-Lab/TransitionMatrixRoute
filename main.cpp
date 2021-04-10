@@ -34,7 +34,7 @@ int main() {
         std::vector<IndexType> path;
 
 
-        if(globalRoute.constructTree2(n_wires,init_index,target_index,divided_vec)){
+        if(globalRoute.constructTree(n_wires,init_index,target_index,divided_vec)){
             path = globalRoute.getBestSolution();
             for(auto i :path)std::cout<<i<<"->";
             std::cout<<"\n";
@@ -47,7 +47,11 @@ int main() {
         auto duration = duration_cast<milliseconds>(stop - start);
         out<<duration.count()<<"\n";
 
-        exportSVG(n_wires,k,path);
+        auto now = std::chrono::system_clock::now();
+        auto in_time_t = std::chrono::system_clock::to_time_t(now);
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %X");
+        exportSVG(n_wires,path,"image/image_"+ss.str()+".svg");
         auto estimate_steps = getHeuristic(n_wires,init_state,target_state);
         writeToDatabase(n_wires,init_state,target_state,estimate_steps,path.size()-estimate_steps-1,divided_vec,duration.count(),path);
 
