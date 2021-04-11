@@ -9,16 +9,13 @@ using namespace std::chrono;
 int main() {
     auto n_wires = 8;
     std::vector<int> divided_vec{2,2,2,2};
-    char s[200];
-    sprintf(s,"global_route_running_time_%d_nanowires.txt",n_wires);
-    std::ofstream out(s);
+
     //std::random_device rd;
     std::default_random_engine rd;
     std::uniform_int_distribution<int> dist(0, 3);
 
     for(auto k=0;k<20;++k) {
         GlobalRoute globalRoute;
-        //globalRoute.readTransitiomMatrices();
         globalRoute.init();
         std::cout<<"Iteration: "<<k<<std::endl;
         NanowirePositionType init_state;
@@ -45,7 +42,7 @@ int main() {
 
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<milliseconds>(stop - start);
-        out<<duration.count()<<"\n";
+
 
         auto now = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(now);
@@ -56,42 +53,5 @@ int main() {
         writeToDatabase(n_wires,init_state,target_state,estimate_steps,path.size()-estimate_steps-1,divided_vec,duration.count(),path);
 
     }
-    out.close();
 
-    /*
-    using namespace ACSR;
-    using namespace std::chrono;
-
-    //std::random_device r;
-    std::default_random_engine rd;
-    std::uniform_int_distribution<int> dist(0, 3);
-
-    ACSR::GlobalRoute route;
-    route.init();
-    //route.test();
-    auto n_wires = 8;
-
-    NanowirePositionType init_state={{1,3},{0,3},{3,1},{0,3},{0,3},{2,3},{3,3},{2,1}  };
-    NanowirePositionType target_state={{0,1},{1,2},{1,2},{3,3},{2,0},{2,2},{1,0},{3,2}  };
-    auto start = high_resolution_clock::now();
-    std::vector<IndexType> path;
-    std::pair<NodePtr,NodePtr> tree;
-    std::vector<int> divided_vec{4,4};
-
-    auto init_index = electrodeVectorToIndex(n_wires,init_state);
-    auto target_index = electrodeVectorToIndex(n_wires,target_state);
-
-    if(route.constructTree2(n_wires,init_index,target_index,divided_vec)){
-        auto path = route.getBestSolution();
-        for(auto&p:path){
-            std::cout<<p<<"->";
-        }
-        std::cout<<'\n';
-    }
-
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<milliseconds>(stop - start);
-    std::cout<<"Total Computation Time: "<<duration.count()<<"\n";
-
-    return 0;*/
 }
