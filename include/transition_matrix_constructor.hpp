@@ -13,17 +13,38 @@
 
 namespace acsr {
 
+    /**
+     * matrix constructor class
+     */
     class TransitionMatrixConstructor {
 
     public:
+        /**
+         * default constructor
+         */
         TransitionMatrixConstructor() = default;
 
+        /**
+         * default deconstructor
+         */
         virtual ~TransitionMatrixConstructor() = default;
 
+        /**
+         * copy constructor
+         */
         TransitionMatrixConstructor(const TransitionMatrixConstructor &) = delete;
 
+        /**
+         * assign
+         * @return
+         */
         TransitionMatrixConstructor &operator=(const TransitionMatrixConstructor &) = delete;
 
+        /**
+         * constructor a transition matrix
+         * @param n_wire wire count
+         * @param file_name saving file name
+         */
         void constructMatrix(int n_wire, const std::string &file_name) {
             std::cout << "start to construct control matrix:\n\tNanowires: " << n_wire << std::endl;
             std::vector<Eigen::Triplet<int, IndexType>> data;
@@ -56,6 +77,11 @@ namespace acsr {
 
         }
 
+        /**
+         * constructor a transition control matrix
+         * @param n_wire wire count
+         * @param file_name saving file name
+         */
         void constructControlMatrix(int n_wire, const std::string &file_name) {
             std::cout << "start to construct:\n\tNanowires: " << n_wire << std::endl;
             std::vector<Eigen::Triplet<ControlType , IndexType>> control_data;
@@ -88,16 +114,31 @@ namespace acsr {
             std::cout << "Transition Control Matrix Construct Finished!\n Save to " << file_name << "\n";
         }
 
+        /**
+         * read transition control matrix from file
+         * @param file_name file name
+         * @param control_matrix control matrix name
+         */
         static void readControlMatrix(const std::string &file_name,
                                       Eigen::SparseMatrix<ControlType, Eigen::ColMajor, IndexType> &control_matrix) {
             readSparsMatrixFromBin(file_name, control_matrix);
         }
 
+        /**
+         * read transition matrix from file
+         * @param file_name file name
+         * @param matrix transition matrix
+         */
         static void readTransitionMatrix(const std::string &file_name,
-                                         Eigen::SparseMatrix<int, Eigen::ColMajor, IndexType> &control_matrix) {
-            readSparsMatrixFromBin(file_name, control_matrix);
+                                         Eigen::SparseMatrix<int, Eigen::ColMajor, IndexType> &matrix) {
+            readSparsMatrixFromBin(file_name, matrix);
         }
 
+        /**
+         * transition vector while contains possible states by applying one step on a state
+         * @param states state
+         * @return transition vector
+         */
         std::vector<NanowirePositionType> exploreHelper(const NanowirePositionType &states) {
             if (states.empty())
                 return std::vector<NanowirePositionType>();
@@ -130,13 +171,20 @@ namespace acsr {
 
 
     private:
+        /**
+         * steering direction
+         */
         const std::vector<SteerDirection> steer_directions = {SteerDirection::Up, SteerDirection::Down,
                                                               SteerDirection::Left, SteerDirection::Right,
                                                               SteerDirection::Stay};
 
-
-
-
+        /**
+         * steer from a state
+         * @param state state
+         * @param direction direction
+         * @param new_position new state
+         * @return true if steer can be applied
+         */
         static bool
         steer(const std::pair<int, int> &state, SteerDirection direction, std::pair<int, int> &new_position) {
             new_position = state;
@@ -164,13 +212,19 @@ namespace acsr {
             return true;
         }
 
-
-        static bool validMove(const NanowirePositionType &state1, const NanowirePositionType &state2, int size) {
+        /**
+         * check whether state1 can be transfered to state2 by applying one step
+         * @param state1 state1
+         * @param state2 state2
+         * @param n_wires nanowire count
+         * @return true if success
+         */
+        static bool validMove(const NanowirePositionType &state1, const NanowirePositionType &state2, int n_wires) {
             if (state1 == state2)return true;
 
-            for (uint i = 0; i < size; ++i) {
+            for (uint i = 0; i < n_wires; ++i) {
                 if (abs((state1[i].first - state2[i].first) + (state1[i].second - state2[i].second)) > 1)return false;
-                for (uint j = i + 1; j < size; ++j) {
+                for (uint j = i + 1; j < n_wires; ++j) {
 
                     //if more than one nanowire on a same electrode, the should both move on or both stay
                     if (state1[i] == state1[j]) {
@@ -188,8 +242,6 @@ namespace acsr {
             }
             return true;
         }
-
-
     };
 
 }

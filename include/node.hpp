@@ -31,6 +31,12 @@ namespace acsr {
         return electrode_vector;
     }
 
+    /**
+     * index to divided indice
+     * @param index index
+     * @param divided_vec nanowire divided vector
+     * @return sub indice vector
+     */
     std::vector<IndexType> indexToSubIndexVec(IndexType index,const std::vector<int>& divided_vec) {
         std::vector<IndexType> sub_node_index(divided_vec.size());
         for(auto i=divided_vec.size()-1;i>0;--i){
@@ -42,6 +48,12 @@ namespace acsr {
         return sub_node_index;
     }
 
+    /**
+     * position vector to index
+     * @param n_wires wire count
+     * @param electrode_vector position vector
+     * @return index (int64 type)
+     */
     IndexType electrodeVectorToIndex(int n_wires, const NanowirePositionType &electrode_vector) {
         IndexType index = (electrode_vector[0].first << 2) + electrode_vector[0].second;
         for (auto i = 1; i < n_wires; ++i)
@@ -49,6 +61,12 @@ namespace acsr {
         return index;
     }
 
+    /**
+     * combine sub indice vector to an index
+     * @param sub_index_vec sub index vec
+     * @param divided_vec nanowire divided vector
+     * @return index
+     */
     IndexType subIndexVecToIndex(const std::vector<IndexType>& sub_index_vec,const std::vector<int>& divided_vec) {
         auto index = sub_index_vec[0];
         for(auto i=1;i<divided_vec.size();++i)
@@ -56,109 +74,50 @@ namespace acsr {
         return index;
     }
 
-    /*
-    struct TransitionControlType {
-        uint32_t control{};
 
-        TransitionControlType() : control(0) {}
-
-        explicit TransitionControlType(uint32_t _control) : control(_control) {
-        }
-
-        TransitionControlType &operator=(const TransitionControlType &myControlType) {
-            control = myControlType.control;
-            return *this;
-        }
-
-        TransitionControlType &operator=(uint32_t other) {
-            control = other;
-            return *this;
-        }
-
-        inline TransitionControlType operator+(const TransitionControlType &other) {
-            return *this;
-        }
-
-        friend TransitionControlType operator+ (const TransitionControlType& lhs, const TransitionControlType &rhs) {
-            return rhs;
-        }
-        friend bool operator== (const TransitionControlType& lhs, const TransitionControlType &rhs) {
-            return lhs.control == rhs.control;
-        }
-
-        friend bool operator== (const TransitionControlType& lhs, uint32_t rhs) {
-            return lhs.control == rhs;
-        }
-        friend bool operator< (const TransitionControlType& lhs, const TransitionControlType &rhs) {
-            return lhs.control < rhs.control;
-        }
-        friend bool operator< (const TransitionControlType& lhs, uint32_t rhs) {
-            return lhs.control < rhs;
-        }
-
-
-        inline TransitionControlType operator-(const TransitionControlType &other) {
-            return *this;
-        }
-
-
-
-        inline TransitionControlType operator*(const TransitionControlType &other) const {
-            //return TransitionControlType(0);
-
-            if (control == 0 || other.control == 0)return TransitionControlType(0);
-            auto c = control | other.control;
-            auto total_control = c;
-            while (c != 0) {
-                if ((c & 0b11) == 0b11)return TransitionControlType(0);
-                c = c >> 2;
-            }
-            return TransitionControlType(total_control);
-        }
-
-        inline TransitionControlType operator*(int other) const {
-            if (control == 0 || other == 0)return TransitionControlType(0);
-            return TransitionControlType(control);
-        }
-
-
-        explicit operator uint32_t() const {
-            return control;
-        }
-
-        TransitionControlType &operator+=(const TransitionControlType &other) {
-            control = other.control;
-            return *this;
-        }
-
-        friend std::ostream &operator<<(std::ostream &out, const TransitionControlType &val) {
-            out << val.control;
-            return out;
-        }
-
-    };*/
-
-
+    /**
+     * control column type
+     */
     struct ControlVectorType{
     public:
+
+        /**
+         * default constructor
+         */
         ControlVectorType()=default;
+
+        /**
+         * constructor
+         * @param size
+         */
         explicit ControlVectorType(IndexType size):_size(size){
 
         }
+
+        /**
+         * set data
+         * @param data data
+         */
         void setData(const std::vector<std::pair<IndexType,ControlType>>& data){
             vec = data;
-            _element_size = data.size();
+            //_element_size = data.size();
         }
 
+        /**
+         * set size
+         * @param size
+         */
         void setSize(IndexType size){
             _size = size;
         }
 
         void setData(std::vector<std::pair<IndexType,ControlType>>&& data){
             vec = std::move(data);
-            _element_size = vec.size();
         }
 
+        /*
+         * get indice vector
+         */
         std::vector<IndexType> getIndexVector(){
             std::vector<IndexType> v(vec.size());
             std::transform(vec.begin(),vec.end(),v.begin(),[](const std::pair<IndexType,ControlType>& p){
@@ -167,96 +126,141 @@ namespace acsr {
             return v;
         }
 
-        friend ControlVectorType operator*(const ControlVectorType& lhs,const ControlVectorType& rhs){
-            ControlVectorType productor(IndexType(lhs._size*rhs._size));
-            std::vector<std::pair<IndexType,ControlType>> data;
-            for(auto& p1:lhs.vec){
-                for(auto p2:rhs.vec){
-                    if (p1.second == 0 || p2.second == 0)continue;
-                    auto c = p1.second | p2.second;
-                    auto total_control = c;
-                    auto flag = true;
-                    while (c != 0) {
-                        if ((c & 0b11) == 0b11){
-                            flag = false;
-                            break;
-                        }
-                        c = c >> 2;
-                    }
-                    if(flag)
-                    data.emplace_back(p1.first*rhs._size+p2.first,total_control);
-                }
-            }
-            productor.setData(std::move(data));
-            return productor;
-        }
         std::vector<std::pair<IndexType,ControlType>> vec{};
         IndexType _size{};
-        IndexType _element_size{};
     };
 
-
-
+    /**
+     * tree node
+     */
     class TransitionTreeNode : public std::enable_shared_from_this<TransitionTreeNode> {
     public:
+        /**
+         * default construtor
+         */
         TransitionTreeNode() = default;
 
+        /**
+         * constructor
+         * @param _state state
+         * @param _level level
+         */
         TransitionTreeNode(IndexType _state, int _level) : state(_state), level(_level) {}
 
+        /**
+         * default deconstructor
+         */
         virtual ~TransitionTreeNode() = default;
 
+        /**
+         * copy constructor
+         */
         TransitionTreeNode(const TransitionTreeNode &) = delete;
 
+        /*
+         * assign
+         */
         TransitionTreeNode &operator=(const TransitionTreeNode &) = delete;
 
+        /**
+         * create a add a child node and insert
+         * @param child_index  child index
+         * @param _level child level
+         * @return child node ptr
+         */
         std::shared_ptr<TransitionTreeNode> addChild(IndexType child_index, int _level) {
             auto child = std::make_shared<TransitionTreeNode>(child_index, _level);
             children.push_back(child);
             return child;
         }
 
+        /**
+         * add an existing node as child
+         * @param child child ptr
+         */
         void addChild(const std::shared_ptr<TransitionTreeNode> &child) {
             children.push_back(child);
         }
 
+        /**
+         * get state
+         * @return
+         */
         IndexType getState() const {
             return state;
         }
 
+        /**
+         * get level
+         * @return
+         */
         int getLevel() const {
             return level;
         }
 
+        /**
+         * set parent node
+         * @param _parent parent node
+         */
         void setParent(const std::shared_ptr<TransitionTreeNode> &_parent) {
             parent = _parent;
         }
 
+        /**
+         * get parent node
+         * @return
+         */
         std::shared_ptr<TransitionTreeNode> &getParent() {
             return parent;
         }
 
+        /**
+         * remove a child
+         * @param child
+         */
         void removeChild(std::shared_ptr<TransitionTreeNode> child) {
             children.remove(child);
         }
 
+        /**
+         * get all children
+         * @return children list
+         */
         std::list<std::shared_ptr<TransitionTreeNode>> &getChildren() {
             return children;
         }
 
+        /**
+         * set state quality
+         * @param value qualilty
+         */
         void setPathQuality(int value) {
             path_quality = value;
         }
 
+        /**
+         * get state quality
+         * @return
+         */
         int getPathQuality() const {
             return path_quality;
         }
 
 
     protected:
+        ///state
         IndexType state{};
+
+        ///tree level
         int level{};
+
+        /// state quality
         int path_quality{};
+
+        ///parent node
         std::shared_ptr<TransitionTreeNode> parent;
+
+        ///children node list
         std::list<std::shared_ptr<TransitionTreeNode>> children;
 
     };
