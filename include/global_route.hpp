@@ -382,7 +382,9 @@ namespace acsr {
                                     auto current_parent = parent_vec[index];
                                     auto vec = getNextStepIndexVecWithinSteps(n_wire, current_parent->getState(),
                                                                               target_index, divided_vec, step - i - 1);
+
                                     for (auto &v:vec) {
+                                        if(v==current_parent->getState())continue;
                                         auto &p = m[v];
                                         if (p == nullptr || p->getPathQuality() > current_quality) {
                                             p = current_parent;
@@ -400,6 +402,7 @@ namespace acsr {
                                                                                 target_index, divided_vec,
                                                                                 step - i - 1);
                     for (auto &v:vec) {
+                        if(v==current_parent->getState())continue;
                         auto &p = m[v];
                         if (p == nullptr || p->getPathQuality() > current_quality) {
                             p = current_parent;
@@ -468,6 +471,7 @@ namespace acsr {
                 return true;
             }
         }
+        return false;
 
     }
 
