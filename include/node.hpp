@@ -199,6 +199,14 @@ namespace acsr {
         }
 
         /**
+         * set level
+         * @param value new level
+         */
+        void setLevel(int value) {
+            level = value;
+        }
+
+        /**
          * set parent node
          * @param _parent parent node
          */
@@ -264,6 +272,23 @@ namespace acsr {
         std::list<std::shared_ptr<TransitionTreeNode>> children;
 
     };
+
+    class AstarNode : public TransitionTreeNode,std::enable_shared_from_this<AstarNode>{
+    public:
+        AstarNode(IndexType _state, int _level,bool _node_state) : TransitionTreeNode(_state,_level),node_state(_node_state) {}
+
+        void setNodeState(bool state){
+            node_state = state;
+        }
+
+        bool getNodeState() const{
+            return node_state;
+        }
+    protected:
+        bool node_state; //true: open set; false: close set;
+    };
+
+
     using NodePtr = std::shared_ptr<TransitionTreeNode>;
 }
 

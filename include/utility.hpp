@@ -622,6 +622,94 @@ namespace acsr {
         }
     }
 
+    void writeToDatabaseAStar(int n_wire,
+                         const NanowirePositionType& init_state,
+                         const NanowirePositionType& target_state,
+                         const std::vector<int>& divided_vec,
+                         long first_solution_time,
+                         long best_solution_time,
+                         long total_running_time,
+                         const std::vector<IndexType>& path){
+        SQLite::Database db("plannerDB.db",SQLite::OPEN_READWRITE|SQLite::OPEN_CREATE);
+
+        //create table
+        {
+            SQLite::Statement query(db, "create table if not exists AStar ("
+                                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                        "nanowire_count INTEGER NOT NULL,"
+                                        "init_state TEXT NOT NULL,"
+                                        "target_state TEXT NOT NULL,"
+                                        "divided_vec TEXT NOT NULL,"
+                                        "first_solution_time INTEGER NOT NULL,"
+                                        "best_solution_time INTEGER,"
+                                        "total_running_time INTEGER,"
+                                        "solution TEXT NOT NULL"
+                                        ")");
+            try {
+                query.exec();
+            } catch (SQLite::Exception &e) {
+                std::cout << "Create Table Error\n";
+                std::cout << e.what();
+                return;
+            }
+        }
+
+        //std::string solution_table_name;
+        ///insert data to table
+        {
+            std::string query_string = "INSERT INTO AStar (nanowire_count,init_state, target_state,divided_vec,first_solution_time,best_solution_time,total_running_time,solution) VALUES(?,?,?,?,?,?,?,?)";
+            SQLite::Statement query(db, query_string);
+
+            std::string init_string, target_string, vec_string;
+            for (auto i = 0; i < n_wire - 1; ++i) {
+                init_string.append(
+                        std::to_string(init_state[i].first) + " " + std::to_string(init_state[i].second) + "  ");
+                target_string.append(
+                        std::to_string(target_state[i].first) + " " + std::to_string(target_state[i].second) + "  ");
+            }
+            init_string.append(
+                    std::to_string(init_state[n_wire - 1].first) + " " + std::to_string(init_state[n_wire - 1].second) +
+                    "  ");
+            target_string.append(std::to_string(target_state[n_wire - 1].first) + " " +
+                                 std::to_string(target_state[n_wire - 1].second) + "  ");
+
+            for (auto i = 0; i < divided_vec.size() - 1; ++i) {
+                vec_string.append(std::to_string(divided_vec[i]) + " ");
+            }
+            vec_string.append(std::to_string(divided_vec[divided_vec.size() - 1]) + " ");
+            std::string solution_str = std::to_string(path.front());
+            for(auto i=1;i<path.size();++i){
+                solution_str+=(' '+std::to_string(path[i]));
+            }
+            /*
+            auto start_time = std::chrono::system_clock::now();
+            auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
+            std::stringstream ss;
+            ss << "solution_";
+            ss << std::put_time(std::localtime(&in_time_t), "%m_%d_%H_%M_%S");
+            solution_table_name = ss.str();*/
+
+            query.bind(1, n_wire);
+            query.bind(2, init_string);
+            query.bind(3, target_string);
+            query.bind(4, vec_string);
+            query.bind(5, first_solution_time);
+            query.bind(6, best_solution_time);
+            query.bind(7, total_running_time);
+            query.bind(8, solution_str);
+
+            try {
+                query.exec();
+            } catch (SQLite::Exception &e) {
+                std::cout << "Insert Solution Error\n";
+                std::cout << e.what();
+                return;
+            }
+        }
+
+    }
+
+
 
 
 }
