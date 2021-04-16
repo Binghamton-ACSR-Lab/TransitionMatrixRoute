@@ -100,6 +100,9 @@ namespace acsr {
         long best_solution_time;
         ///planner start time point
         std::chrono::time_point<std::chrono::system_clock> start_time_point;
+        const int max_running_time = 600; ///seconds
+
+    private:
         /**
          * one propagating step of the planner
          */
@@ -237,6 +240,20 @@ namespace acsr {
 
         run_flag = true;
         start_time_point = std::chrono::system_clock::now();
+
+        std::thread t([this](){
+            using namespace std::chrono_literals;
+            while(run_flag){
+                auto time = std::chrono::system_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::seconds>(time-start_time_point);
+                if(duration.count()>max_running_time){
+                    run_flag = false;
+                }
+                std::this_thread::sleep_for(1s);
+            }
+        });
+        t.detach();
+
         while (run_flag) {
             step();
         }

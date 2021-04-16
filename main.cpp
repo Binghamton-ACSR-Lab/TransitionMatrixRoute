@@ -8,8 +8,8 @@
 using namespace acsr;
 using namespace std::chrono;
 int main() {
-    auto n_wires = 3;
-    std::vector<int> divided_vec{4};
+    auto n_wires = 7;
+    std::vector<int> divided_vec{4,3};
 
     //std::random_device rd;
     std::default_random_engine rd;
