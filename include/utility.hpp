@@ -622,6 +622,17 @@ namespace acsr {
         }
     }
 
+    /**
+     * save astar planner data to db
+     * @param n_wire wire count
+     * @param init_state init state
+     * @param target_state target state
+     * @param divided_vec nanowire divided vector
+     * @param first_solution_time time of finding first solution
+     * @param best_solution_time time of finding the best solution
+     * @param total_running_time total running time
+     * @param path best path
+     */
     void writeToDatabaseAStar(int n_wire,
                          const NanowirePositionType& init_state,
                          const NanowirePositionType& target_state,
@@ -653,9 +664,6 @@ namespace acsr {
                 return;
             }
         }
-
-        //std::string solution_table_name;
-        ///insert data to table
         {
             std::string query_string = "INSERT INTO AStar (nanowire_count,init_state, target_state,divided_vec,first_solution_time,best_solution_time,total_running_time,solution) VALUES(?,?,?,?,?,?,?,?)";
             SQLite::Statement query(db, query_string);
@@ -681,14 +689,6 @@ namespace acsr {
             for(auto i=1;i<path.size();++i){
                 solution_str+=(' '+std::to_string(path[i]));
             }
-            /*
-            auto start_time = std::chrono::system_clock::now();
-            auto in_time_t = std::chrono::system_clock::to_time_t(start_time);
-            std::stringstream ss;
-            ss << "solution_";
-            ss << std::put_time(std::localtime(&in_time_t), "%m_%d_%H_%M_%S");
-            solution_table_name = ss.str();*/
-
             query.bind(1, n_wire);
             query.bind(2, init_string);
             query.bind(3, target_string);
