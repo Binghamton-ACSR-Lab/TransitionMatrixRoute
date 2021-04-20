@@ -3,7 +3,7 @@
 #include "node.hpp"
 
 #include "global_route.hpp"
-#include "acsr_astr.hpp"
+#include "acsr_astar.hpp"
 
 using namespace acsr;
 using namespace std::chrono;
