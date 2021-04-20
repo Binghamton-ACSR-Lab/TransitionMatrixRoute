@@ -193,7 +193,7 @@ namespace acsr {
         for (auto i=0;i<n_wire-1;++i) {
             for(auto j=i+1;j<n_wire;++j) {
                 auto t = (abs(state[i].first - state[j].first) + abs(state[i].second - state[j].second));
-                d1 *= t;
+                //d1 *= t;
                 d2 += t;
             }
         }
@@ -372,6 +372,55 @@ namespace acsr {
         return product;
     }
 
+    std::vector<IndexType> controlVectorProduct(const std::vector<ControlVectorType>& control_vecs,const std::vector<IndexType>& state_index, const std::vector<int>& divided_vec){
+        std::vector<IndexType> product;
+        auto size = divided_vec.size();
+        std::vector<IndexType> cols(size);
+        if(size == 2){
+            ControlType total_control_1;
+            for(auto& p0:control_vecs[0].vec){
+                for(auto& p1:control_vecs[1].vec){
+                    if(controlCombinable(p0.second,p1.second,total_control_1))
+                        product.emplace_back(p0.first*cols[1]+p1.first);
+                }
+            }
+        }else if(size == 3){
+            ControlType total_control_1,total_control_2;
+            for(auto& p0:control_vecs[0].vec){
+                for(auto&p1 : control_vecs[1].vec){
+                    auto combinable = controlCombinable(p0.second,p1.second,total_control_1);
+                    if(!combinable)continue;
+                    auto index1  =p0.first*cols[1]+p1.first;
+                    for(auto& p2:control_vecs[2].vec){
+                        if(controlCombinable(total_control_1,p2.second,total_control_2)){
+                            product.emplace_back(index1*cols[2]+p2.first);
+                        }
+                    }
+                }
+            }
+        }else if(size == 4){
+            ControlType total_control_1,total_control_2,total_control_3;
+            for(auto& p0:control_vecs[0].vec){
+                for(auto& p1:control_vecs[1].vec){
+                    auto combinable1 = controlCombinable(p0.second,p1.second,total_control_1);
+                    if(!combinable1)continue;
+                    auto index1  =p0.first*cols[1]+p1.first;
+                    for(auto& p2:control_vecs[2].vec){
+                        auto combinable2 = controlCombinable(total_control_1,p2.second,total_control_2);
+                        if(!combinable2)continue;
+                        auto index2  =index1*cols[2]+p2.first;
+                        for(auto& p3:control_vecs[3].vec){
+                            if(controlCombinable(total_control_2,p3.second,total_control_3)){
+                                product.emplace_back(index2*cols[3]+p3.first);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return product;
+    }
+
 
     /**
      * export solution path to svg
@@ -496,6 +545,7 @@ namespace acsr {
                          int over_step,
                          const std::vector<int>& divided_vec,
                          long running_time,
+                         long path_quality,
                          const std::vector<IndexType>& path){
         SQLite::Database db("plannerDB.db",SQLite::OPEN_READWRITE|SQLite::OPEN_CREATE);
 
@@ -510,6 +560,7 @@ namespace acsr {
                                         "over_step INTEGER,"
                                         "divided_vec TEXT NOT NULL,"
                                         "time INTEGER,"
+                                        "path_quality INTEGER,"
                                         "solution_table TEXT NOT NULL"
                                         ")");
             try {
@@ -524,7 +575,7 @@ namespace acsr {
         std::string solution_table_name;
         ///insert data to table
         {
-            std::string query_string = "INSERT INTO GlobalRoute (nanowire_count,init_state, target_state, estimate_step,over_step,divided_vec,time,solution_table) VALUES(?,?,?,?,?,?,?,?)";
+            std::string query_string = "INSERT INTO GlobalRoute (nanowire_count,init_state, target_state, estimate_step,over_step,divided_vec,time,path_quality,solution_table) VALUES(?,?,?,?,?,?,?,?,?)";
             SQLite::Statement query(db, query_string);
 
             std::string init_string, target_string, vec_string;
@@ -559,7 +610,8 @@ namespace acsr {
             query.bind(5, over_step);
             query.bind(6, vec_string);
             query.bind(7, running_time);
-            query.bind(8, solution_table_name);
+            query.bind(8, path_quality);
+            query.bind(9, solution_table_name);
 
             try {
                 query.exec();
@@ -569,7 +621,7 @@ namespace acsr {
                 return;
             }
         }
-
+/*
         {
             std::string query_string = "create table if not exists ";
             query_string += solution_table_name;
@@ -619,7 +671,7 @@ namespace acsr {
                     return;
                 }
             }
-        }
+        }*/
     }
 
     /**
@@ -640,6 +692,10 @@ namespace acsr {
                          long first_solution_time,
                          long best_solution_time,
                          long total_running_time,
+                         int init_cost,
+                         long init_quality,
+                         int best_cost,
+                         long best_quality,
                          const std::vector<IndexType>& path){
         SQLite::Database db("plannerDB.db",SQLite::OPEN_READWRITE|SQLite::OPEN_CREATE);
 
@@ -654,6 +710,10 @@ namespace acsr {
                                         "first_solution_time INTEGER NOT NULL,"
                                         "best_solution_time INTEGER,"
                                         "total_running_time INTEGER,"
+                                        "init_cost INTEGER,"
+                                        "init_quality INTEGER,"
+                                        "best_cost INTEGER,"
+                                        "best_quality INTEGER,"
                                         "solution TEXT NOT NULL"
                                         ")");
             try {
@@ -665,7 +725,7 @@ namespace acsr {
             }
         }
         {
-            std::string query_string = "INSERT INTO AStar (nanowire_count,init_state, target_state,divided_vec,first_solution_time,best_solution_time,total_running_time,solution) VALUES(?,?,?,?,?,?,?,?)";
+            std::string query_string = "INSERT INTO AStar (nanowire_count,init_state, target_state,divided_vec,first_solution_time,best_solution_time,total_running_time,init_cost,init_quality,best_cost,best_quality,solution) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)";
             SQLite::Statement query(db, query_string);
 
             std::string init_string, target_string, vec_string;
@@ -696,7 +756,11 @@ namespace acsr {
             query.bind(5, first_solution_time);
             query.bind(6, best_solution_time);
             query.bind(7, total_running_time);
-            query.bind(8, solution_str);
+            query.bind(8, init_cost);
+            query.bind(9, init_quality);
+            query.bind(10, best_cost);
+            query.bind(11, best_quality);
+            query.bind(12, solution_str);
 
             try {
                 query.exec();

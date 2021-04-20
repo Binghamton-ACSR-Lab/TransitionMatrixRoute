@@ -68,7 +68,7 @@ namespace acsr {
          */
         std::vector<IndexType> getBestSolution() const;
 
-
+        std::vector<IndexType> init_path;
     private:
         ///a vector of control matrix, total size = 4 for nanowire count = 1,2,3,4
         std::vector<ControlMatrixType> _control_matrix_vec;
@@ -100,7 +100,8 @@ namespace acsr {
         long best_solution_time;
         ///planner start time point
         std::chrono::time_point<std::chrono::system_clock> start_time_point;
-        const int max_running_time = 600; ///seconds
+        const int max_running_time = 800; ///seconds
+
 
     private:
         /**
@@ -259,7 +260,7 @@ namespace acsr {
         }
         ///get running time
         auto time = std::chrono::system_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time-start_time_point);
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(time-start_time_point);
         total_running_time = duration.count();
     }
 
@@ -318,9 +319,11 @@ namespace acsr {
                 best_solution.second = target->getPathQuality();
                 ///save first solution time
                 auto time = std::chrono::system_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time-start_time_point);
+                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(time-start_time_point);
                 first_solution_time = duration.count();
                 best_solution_time = first_solution_time;
+
+                init_path = getBestSolution();
                 ///trim tree, remove the nodes with greater cost than target
                 trimTree(root);
             }
@@ -331,7 +334,7 @@ namespace acsr {
                 best_solution.second = target->getPathQuality();
                 ///update the best solution time
                 auto time = std::chrono::system_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time-start_time_point);
+                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(time-start_time_point);
                 best_solution_time = duration.count();
                 ///trim tree, remove the nodes with greater cost than target
                 trimTree(root);

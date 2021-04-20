@@ -64,6 +64,15 @@ namespace acsr {
          */
         std::vector<IndexType> getBestSolution();
 
+        /**
+        * get the posible indice of performing one step from index
+        * @param index the original index
+        * @param divided_vec a vector of nanowire count
+        * @return the vector of possible indice
+        */
+        std::vector<IndexType> getNextStepIndexVec(int n_wire,IndexType index,const std::vector<int>& divided_vec);
+
+
     private:
         ///a vector of control matrix, total size = 4 for nanowire count = 1,2,3,4
         std::vector<ControlMatrixType> _control_matrix_vec;
@@ -78,13 +87,6 @@ namespace acsr {
 
 
     private:
-        /**
-         * get the posible indice of performing one step from index
-         * @param index the original index
-         * @param divided_vec a vector of nanowire count
-         * @return the vector of possible indice
-         */
-        //std::vector<IndexType> getNextStepIndexVec(IndexType index,const std::vector<int>& divided_vec);
 
         /**
          * get the posible indice of performing one step from index, the cost of those indice to target should within step
@@ -201,7 +203,7 @@ namespace acsr {
                 std::vector<std::unordered_map<IndexType, NodePtr>> children_map_vecs(thread_count);
                 std::vector<std::thread> thread_vec;
                 std::cout << "Construct Tree, Step " << i + 1 << "\n";
-                auto start = std::chrono::high_resolution_clock::now();
+                //auto start = std::chrono::high_resolution_clock::now();
                 for (auto k = 0; k < thread_count - 1; ++k) {
                     auto &m = children_map_vecs[k];
                     thread_vec.emplace_back(
@@ -243,10 +245,10 @@ namespace acsr {
                     if (t.joinable())t.join();
                 }
 
-                auto stop = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-                std::cout << "Find Layer Cost: " << duration.count() << '\n';
-                start = stop;
+//                auto stop = std::chrono::high_resolution_clock::now();
+//                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+//                std::cout << "Find Layer Cost: " << duration.count() << '\n';
+//                start = stop;
 
 
                 while (thread_count > 1) {
@@ -266,10 +268,10 @@ namespace acsr {
                 }
                 auto children_map = std::move(children_map_vecs[0]);
 
-                stop = std::chrono::high_resolution_clock::now();
-                duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-                std::cout << "Combine Cost: " << duration.count() << '\n';
-                start = stop;
+//                stop = std::chrono::high_resolution_clock::now();
+//                duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+//                std::cout << "Combine Cost: " << duration.count() << '\n';
+//                start = stop;
 
                 std::vector<NodePtr> temp_parent_vec;
                 for (auto &p:children_map) {
@@ -282,9 +284,9 @@ namespace acsr {
                 if (i == step - 1 &&!temp_parent_vec.empty()) {
                     target = temp_parent_vec[0];
                 }
-                stop = std::chrono::high_resolution_clock::now();
-                duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-                std::cout << "Add Node Cost: " << duration.count() << '\n';
+//                stop = std::chrono::high_resolution_clock::now();
+//                duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+//                std::cout << "Add Node Cost: " << duration.count() << '\n';
                 /*
                 for (auto &p:parent_vec) {
                     trimLeaf(p);
@@ -373,6 +375,22 @@ namespace acsr {
             }
         }
         map2.clear();
+    }
+
+    std::vector<IndexType>
+    GlobalRoute::getNextStepIndexVec(int n_wire, IndexType index, const std::vector<int> &divided_vec) {
+        auto index_vec = indexToSubIndexVec(index,divided_vec);
+        auto size = divided_vec.size();
+        if(size==1){
+            std::vector<IndexType> v;
+            return _control_matrix_vec[divided_vec[0]-1][index_vec[0]].getIndexVector();
+        }else{
+            std::vector<ControlVectorType> control_vec(size);
+            for(auto i=0;i<size;++i){
+                control_vec[i]=_control_matrix_vec[divided_vec[i]-1][index_vec[i]];
+            }
+            return controlVectorProduct(control_vec,index_vec,divided_vec);
+        }
     }
 }
 #endif //TRANSITIONMATRIXROUTE_GLOBAL_ROUTE_HPP
