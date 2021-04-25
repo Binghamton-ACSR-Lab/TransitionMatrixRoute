@@ -193,8 +193,7 @@ namespace acsr {
             std::vector parent_vec{root};
             for (auto i = 0; i < step; ++i) {
                 if(parent_vec.empty()){
-                    std::thread t(&destroyBranch, root);
-                    t.detach();
+                    root.reset();
                     break;
                 }
                 auto total_size = parent_vec.size();
@@ -278,7 +277,7 @@ namespace acsr {
                     auto node = std::make_shared<TransitionTreeNode>(p.first, i + 1);
                     node->setPathQuality(p.second->getPathQuality() + getQuality(n_wire, p.first));
                     node->setParent(p.second);
-                    //p.second->addChild(node);
+                    p.second->addChild(node);
                     temp_parent_vec.push_back(node);
                 }
                 if (i == step - 1 &&!temp_parent_vec.empty()) {
@@ -295,8 +294,7 @@ namespace acsr {
                 parent_vec = std::move(temp_parent_vec);
             }
             if (target == nullptr) {
-                std::thread t(&destroyBranch, root);
-                t.detach();
+                root.reset();
             } else {
                 std::cout << "Construct Forward Tree Successfully!\n";
                 return true;
@@ -310,9 +308,7 @@ namespace acsr {
      * deconstruct, destroy tree
      */
     GlobalRoute::~GlobalRoute() {
-        boost::filesystem::remove_all("temp");
-        std::thread t(&destroyBranch,root);
-        t.detach();
+        root.reset();
     }
 
     /**
@@ -324,9 +320,10 @@ namespace acsr {
         if(root== nullptr || target== nullptr)return solution;
         auto n = target;
         solution.push_back(n->getState());
-        while(n->getLevel()>0){
-            n = n->getParent();
-            solution.push_back(n->getState());
+        while(n->getLevel()>=1){
+            auto p = n->getParent();
+            solution.push_back(p->getState());
+            n = p;
         }
         return solution;
     }

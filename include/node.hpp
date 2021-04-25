@@ -133,7 +133,7 @@ namespace acsr {
     /**
      * tree node
      */
-    class TransitionTreeNode : public std::enable_shared_from_this<TransitionTreeNode> {
+class TransitionTreeNode: public std::enable_shared_from_this<TransitionTreeNode>{
     public:
         /**
          * default construtor
@@ -218,8 +218,15 @@ namespace acsr {
          * get parent node
          * @return
          */
-        std::shared_ptr<TransitionTreeNode> &getParent() {
-            return parent;
+        std::shared_ptr<TransitionTreeNode> getParent() {
+            std::cout<<parent.use_count();
+            if(parent.expired()){
+                return nullptr;
+
+            }else{
+                return parent.lock();
+            }
+            //return parent.lock();
         }
 
         /**
@@ -266,14 +273,14 @@ namespace acsr {
         int path_quality{};
 
         ///parent node
-        std::shared_ptr<TransitionTreeNode> parent;
+        std::weak_ptr<TransitionTreeNode> parent;
 
         ///children node list
         std::list<std::shared_ptr<TransitionTreeNode>> children;
 
     };
 
-    class AstarNode : public TransitionTreeNode,std::enable_shared_from_this<AstarNode>{
+    class AstarNode : public TransitionTreeNode{
     public:
         AstarNode(IndexType _state, int _level,bool _node_state) : TransitionTreeNode(_state,_level),node_state(_node_state) {}
 

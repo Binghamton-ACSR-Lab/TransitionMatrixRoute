@@ -212,24 +212,6 @@ namespace acsr {
     }
 
     /**
-     * destroy a branch of a tree
-     * @param node
-     */
-    void destroyBranch(NodePtr node){
-        if(node== nullptr)return;
-        if(node->getParent()){
-            node->getParent()->removeChild(node);
-            node->setParent(nullptr);
-        }
-        auto children = node->getChildren();
-        for(auto& child:children){
-            destroyBranch(child);
-        }
-        node->getChildren().clear();
-        node.reset();
-    }
-
-    /**
      * remove a leaf of a tree, if the parent of the removed leaf becomes a leaf, then it will be removed
      * @param leaf
      */

@@ -78,9 +78,6 @@ void transitionVectorCompare(int n_wires){
         }
 
     }
-
-
-
 }
 
 void runTransitionMatrixPlanner(int n_wires){
