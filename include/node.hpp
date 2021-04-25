@@ -219,14 +219,11 @@ class TransitionTreeNode: public std::enable_shared_from_this<TransitionTreeNode
          * @return
          */
         std::shared_ptr<TransitionTreeNode> getParent() {
-            std::cout<<parent.use_count();
             if(parent.expired()){
                 return nullptr;
-
             }else{
                 return parent.lock();
             }
-            //return parent.lock();
         }
 
         /**
