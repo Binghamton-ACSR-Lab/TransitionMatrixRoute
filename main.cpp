@@ -8,7 +8,7 @@
 using namespace acsr;
 using namespace std::chrono;
 
-std::vector<std::vector<int>> divided_vecs{{2},{3},{4},{3,2},{3,3},{4,3},{4,4},{3,3,3},{3,3,4},{3,4,4},{4,4,4},{4,3,3,3},{4,4,3,3}};
+const std::vector<std::vector<int>> divided_vecs{{2},{3},{4},{3,2},{3,3},{4,3},{4,4},{3,3,3},{3,3,4},{3,4,4},{4,4,4},{4,3,3,3},{4,4,3,3}};
 
 void transitionVectorCompare(int n_wires){
     std::cout<<"transitionVectorCompare\nWire Count = "<<n_wires<<std::endl;
